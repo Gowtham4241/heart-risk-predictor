@@ -1,59 +1,34 @@
+import os # <-- ADDED: To read the dynamic port assigned by Render
 from flask import Flask, request, render_template
 import pickle
 import numpy as np
-import os
-import requests
-from requests.exceptions import RequestException
+
+# Removed the unused "import requests" that caused the error
 
 app = Flask(__name__)
 
-def download_model_from_env():
-    """If MODEL_URL is set in env, try to download model.pkl to working dir."""
-    model_url = os.getenv('MODEL_URL')
-    if not model_url:
-        return False, 'MODEL_URL not set'
-
-    try:
-        resp = requests.get(model_url, timeout=10)
-        resp.raise_for_status()
-        with open('model.pkl', 'wb') as f:
-            f.write(resp.content)
-        return True, 'Downloaded'
-    except RequestException as e:
-        return False, str(e)
-
-
-# Load model (try local file first, then optional download)
-model = None
-if os.path.exists('model.pkl'):
-    try:
-        with open('model.pkl', 'rb') as file:
-            model = pickle.load(file)
-            print('✅ Loaded model.pkl from local file')
-    except Exception as e:
-        print(f'❌ Failed to load local model.pkl: {e}')
-
-if model is None:
-    ok, msg = download_model_from_env()
-    if ok:
-        try:
-            with open('model.pkl', 'rb') as file:
-                model = pickle.load(file)
-                print('✅ Loaded model.pkl after download')
-        except Exception as e:
-            print(f'❌ Downloaded model but failed to load: {e}')
-    else:
-        print(f'⚠️ Model not available locally and download skipped/failed: {msg}')
+# Load model
+try:
+    with open('model.pkl', 'rb') as file:
+        model = pickle.load(file)
+    print("✅ Model loaded successfully.")
+except FileNotFoundError:
+    print("❌ Model file not found. Please ensure 'model.pkl' is in the root directory.")
+    model = None
+except Exception as e:
+    print(f"❌ An error occurred while loading the model: {e}")
+    model = None
 
 @app.route('/')
 def home():
-    return  render_template('index.html')
-    #return render_template('index.html')
+    # Flask looks for 'index.html' inside the 'templates' folder
+    return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Get data from form
+        # 1. Get data from form (input names must match 'index.html')
+        # Ensure all data is converted to float for the model
         Age = float(request.form['age'])
         cigsPerDay = float(request.form['cigsPerDay'])
         Diabetes = float(request.form['diabetes'])
@@ -62,25 +37,40 @@ def predict():
         BMI = float(request.form['BMI'])
         glucose = float(request.form['glucose'])
 
-        # Create feature array
+        # 2. Create feature array for the model
         features = np.array([[Age, cigsPerDay, Diabetes, TotalCholastrol, DiaBP, BMI, glucose]])
 
-        # Check if model is loaded
+        # 3. Check if model is loaded
         if model is None:
-            return render_template('index.html', prediction_text="Model not loaded. Please check 'model.pkl'.")
+            return render_template('index.html', prediction_text="Model not loaded. Deployment error.")
 
-        # Make prediction
+        # 4. Make prediction
         prediction = model.predict(features)[0]
-        result = "RISK ✅" if prediction == 1 else "NO RISK ❌"
+        
+        # Determine the result text
+        if prediction == 1:
+            result = "HIGH RISK ✅"
+            message = "Based on the provided data, the model predicts a high risk of coronary heart disease."
+        else:
+            result = "LOW RISK ❌"
+            message = "Based on the provided data, the model predicts a low risk of coronary heart disease."
 
-        return render_template('index.html', prediction_text=f'RISK of coronary heart disease: {result}')
+        return render_template(
+            'index.html', 
+            prediction_text=f'Predicted Result: {result}',
+            detail_message=message
+        )
 
-    except ValueError as e:
-        return render_template('index.html', prediction_text=f'ValueError: {str(e)}')
+    except ValueError:
+        return render_template('index.html', prediction_text='Error: Please ensure all fields are filled correctly with numbers.')
     except KeyError as e:
-        return render_template('index.html', prediction_text=f'KeyError: {str(e)}')
+        return render_template('index.html', prediction_text=f'Error: Missing form field. Please check if "{e.args[0]}" exists in index.html.')
     except Exception as e:
-        return render_template('index.html', prediction_text=f'Error: {str(e)}')
+        # Catch any other unexpected errors
+        return render_template('index.html', prediction_text=f'An unexpected error occurred: {str(e)}')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Use the port provided by the environment (Render), or default to 5000 for local development
+    # This is CRITICAL for deployment platforms like Render.
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
