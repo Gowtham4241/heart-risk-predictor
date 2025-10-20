@@ -1,0 +1,15 @@
+# .gitignore
+# Ignore virtual environment directories
+venv/
+.venv/
+env/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore the dataset if it's large (optional, but good practice)
+HEARTDISEASES1.csv
+
+# Ignore model training file (optional)
+experiment3.ipynb
