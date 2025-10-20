@@ -2,3 +2,5 @@ Flask
 numpy
 scikit-learn
 gunicorn
+requests
+pandas
