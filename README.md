@@ -78,6 +78,11 @@ python app.py
 
 ---
 
+## Live Link
+https://heart-risk-predictor-s81e.onrender.com
+
+--- 
+
 ## License
 
 This project is for educational and learning purposes.
