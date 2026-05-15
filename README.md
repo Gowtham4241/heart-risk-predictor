@@ -1,4 +1,4 @@
-# Logistic Regression Model
+# Heart Disease predictor
 
 ## Overview
 
